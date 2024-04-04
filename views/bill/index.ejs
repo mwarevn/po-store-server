@@ -1,0 +1,212 @@
+<hr>
+<div class="d-flex justify-content-between p-2 align-items-center mt-4">
+	<h4>Danh sách đơn hàng</h4>
+	<button type="button" class="btn btn-primary toggle-modal" data-bs-toggle="modal" data-bs-target="#modalAddBill">
+		Thêm đơn hàng +
+	</button>
+</div>
+<table class="table">
+	<thead>
+		<tr>
+			<th scope="col">#</th>
+			<th scope="col">Tên sản phẩm</th>
+			<th scope="col">Người mua</th>
+			<th scope="col">Số lượng</th>
+			<th scope="col">Ngày mua</th>
+			<th scope="col">Action</th>
+		</tr>
+	</thead>
+	<tbody>
+	</tbody>
+</table>
+
+<!-- Modal add bill -->
+<div class="modal fade" id="modalAddBill" tabindex="-1" aria-labelledby="modalAddBillLabel" aria-hidden="true">
+	<div class="modal-dialog">
+		<div class="modal-content">
+			<form>
+				<div class="modal-header">
+					<h1 class="modal-title fs-5" id="exampleModalLabel">Bill Editor</h1>
+					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+				</div>
+				<div class="modal-body">
+					<div class="mb-3">
+						<label for="email" class="form-label">Người mua</label>
+						<select class="form-select" aria-label="Default select example" id="email" required autocomplete="off"></select>
+					</div>
+					<div class="mb-3">
+						<label for="productId" class="form-label">Sản phẩm</label>
+						<select class="form-select" aria-label="Default select example" id="productId" required autocomplete="off"></select>
+					</div>
+					<div class="mb-3">
+						<label for="quantity" class="form-label">Số lượng</label>
+						<input type="number" class="form-control" id="quantity" required autocomplete="off">
+					</div>
+
+					<button type="reset" id="btn-reset" hidden></button>
+					<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+					<button type="submit" class="btn btn-primary">Save changes</button>
+				</div>
+			</form>
+			<div class="modal-footer"></div>
+		</div>
+	</div>
+</div>
+
+<script>
+	var listProducts = []
+	var listUsers = []
+	var listBills = []
+	var currentId = null;
+	const select_email = document.getElementById('email');
+	const select_product = document.getElementById('productId');
+	const modal = document.getElementById('modalAddBill');
+	const form = modal.querySelector('form');
+	const edEmail = modal.querySelector('#email');
+	const edProductId = modal.querySelector('#productId');
+	const edQuantity = modal.querySelector('#quantity');
+	const tbody = document.querySelector('tbody');
+	const btnToggleModal = document.querySelector('.toggle-modal')
+
+	const getAllProducts = async () => {
+		let getProductsResponse = await fetch('product');
+		let jsonConvert = await getProductsResponse.json();
+		listProducts = jsonConvert.products;
+		if (!listProducts) {
+			alert('Failed to fetch all products!')
+		} else {
+			listProducts.forEach((e, i) => {
+				var option = document.createElement('option');
+				option.innerText = e.name;
+				option.value = e._id;
+				select_product.appendChild(option)
+			});
+		}
+	}
+	const getAllUsers = async () => {
+		let getUsersResponse = await fetch('user');
+		let jsonConvert = await getUsersResponse.json();
+		listUsers = jsonConvert.users;
+		if (!listUsers) {
+			alert('Failed to fetch all users!')
+		} else {
+			listUsers.forEach((e, i) => {
+				var option = document.createElement('option');
+				option.innerText = e.fullName + " - " + e.email;
+				option.value = e.email;
+				select_email.appendChild(option)
+			});
+		}
+	}
+	getAllUsers();
+	getAllProducts();
+
+	const setEditor = id => {
+		currentId = id;
+		var billData = listBills.find(bill => bill._id == currentId);
+
+		new bootstrap.Modal('#modalAddBill', {
+			keyboard: false
+		}).show();
+
+		edEmail.value = billData.email;
+		edProductId.value = billData.productId;
+		edQuantity.value = billData.quantity;
+	}
+
+	const confirmDelete = id => {
+		if (confirm("Are you sure for delete this bill?")) {
+			fetch('bill/delete/' + id, {
+					method: 'DELETE'
+				})
+				.then(res => res.json())
+				.then(res => {
+					if (!res.ok) {
+						alert(res.msg)
+						return;
+					}
+
+					window.location.reload();
+				})
+		}
+	}
+
+	const getAllBills = () => {
+		fetch('bill')
+			.then(res => res.json())
+			.then(res => {
+				if (!res.ok) {
+					alert(res.msg);
+					return
+				}
+
+				listBills = res.bills;
+
+			})
+			.then(() => {
+				tbody.innerHTML = listBills.map((bill, index) => {
+
+					var userBuy = listUsers.find(user => user.email == bill.email)
+					var productBuy = listProducts.find(product => product._id == bill.productId)
+
+					return `
+					<tr>
+						<th scope="row">${index + 1}</th>
+						<td><a href="product/${productBuy._id}">${productBuy.name}</a></td>
+						<td><a href="user/${userBuy._id}">${userBuy.fullName}</a></td>
+						<td>${bill.quantity}</td>
+						<td>${bill.createdAt}</td>
+						<td>
+							<button class="btn btn-danger" onclick="confirmDelete('${bill._id}')">Delete</button>
+							<button class="btn btn-primary" onclick="setEditor('${bill._id}')">Edit</button>	
+						</td>
+					</tr>
+					`
+
+				}).join('')
+
+			})
+	}
+
+	getAllBills();
+
+
+
+	addEventListener('hide.bs.modal', () => {
+		// reset form
+		form.querySelector('#btn-reset').click();
+		currentId = null;
+	})
+
+	modal.addEventListener('shown.bs.modal', () => {
+		form.onsubmit = e => {
+			e.preventDefault();
+
+			var bill = {
+				_id: currentId,
+				email: edEmail.value,
+				productId: edProductId.value,
+				quantity: edQuantity.value
+			}
+
+			currentId || delete bill._id
+
+			fetch(currentId ? "bill/update" : "bill/create", {
+					method: currentId ? 'PUT' : 'POST',
+					headers: {
+						'Content-Type': 'application/json'
+					},
+					body: JSON.stringify(bill)
+				})
+				.then(res => res.json())
+				.then(res => {
+					if (res.ok) {
+						window.location.reload();
+					} else {
+						alert(res.msg)
+					}
+				})
+
+		}
+	})
+</script>

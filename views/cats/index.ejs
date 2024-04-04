@@ -1,0 +1,152 @@
+<!-- button trigger modal -->
+
+
+<hr>
+<div class="d-flex justify-content-between p-2 align-items-center mt-4">
+	<h4>Danh sách danh mục </h4>
+	<button class="btn btn-primary btn-toggle-modal" data-bs-toggle="modal" data-bs-target="#modalAddNewCats">Tạo danh mục mới +</button>
+</div>
+
+<!-- Show all cate -->
+
+<section class="p-5 mx-auto cate-group">
+
+
+
+</section>
+
+<!-- modal add new cats -->
+<div class="modal fade" id="modalAddNewCats" tabindex="-1" aria-labelledby="modalAddNewCatsLabel" aria-hidden="true">
+	<div class="modal-dialog">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h1 class="modal-title fs-5" id="modalAddNewCatsLabel">Category Editor</h1>
+				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+			</div>
+			<div class="modal-body">
+				<form>
+					<div class="mb-3">
+						<label for="cats-input-name" class="form-label">Tên danh mục</label>
+						<input type="text" class="form-control" id="cats-input-name" name="name" aria-describedby="helpInputName">
+						<div id="helpInputName" class="form-text">Vui lòng nhập tên danh mục (Ví dụ Hoa quả...)</div>
+					</div>
+					<button type="reset" class="btn-reset" hidden></button>
+					<button type="submit" class="btn btn-dark">Save</button>
+					<button type="button" class="btn btn-secondary btn-hide-modal" data-bs-dismiss="modal">Cancel</button>
+
+				</form>
+			</div>
+			<div class="modal-footer">
+				<!-- <button type="button" class="btn btn-primary">Save changes</button> -->
+			</div>
+		</div>
+	</div>
+</div>
+<script>
+	const modalAddNewCats = document.getElementById('modalAddNewCats')
+	var btnHideModal = document.querySelector('.btn-hide-modal')
+	var btnReset = modalAddNewCats.querySelector('.btn-reset');
+
+	var cateGroup = document.querySelector('.cate-group')
+	var currentList = []
+	var btnToggleModal = document.querySelector('.btn-toggle-modal')
+	var currentId = null;
+	const setEditor = id => {
+		currentId = id;
+		btnToggleModal.click();
+	}
+
+	btnHideModal.onclick = () => {
+		currentId = null;
+		btnReset.click()
+	}
+
+	fetch('cats')
+		.then(res => res.json())
+		.then(res => {
+			currentList = res.cats
+			cateGroup.innerHTML = res.cats.map((cate, index) => {
+				return `
+				<div class="" style="display: flex; padding: 10px; justify-content: space-between; border: 1px solid #ddd; border-radius: 12px; align-items: center; margin: 5px auto">
+					<div>
+						<span style="font-weight: bold;margin-right: 15px;">${index + 1}</span>
+						<span>${cate.name}</span>
+					</div>
+					<div class="action">
+						<button class="btn btn-danger" onclick="confirmDelete('${cate._id}')">Delete</button>
+						<button class="btn btn-primary" onclick="setEditor('${cate._id}')">Edit</button>
+					</div>
+				</div>
+				`
+			}).join('')
+		})
+
+
+	const confirmDelete = id => {
+		if (confirm('Are you sure for delete?')) {
+			fetch('cats/delete/' + id, {
+					method: 'DELETE'
+				})
+				.then(res => res.json())
+				.then(res => {
+					if (res.ok) {
+						window.location.reload();
+					}
+				})
+				.catch(err => alert('Error: ' + err))
+		}
+	}
+
+
+	// handle create new category
+	// const modalAddNewCats = document.getElementById('modalAddNewCats')
+	if (modalAddNewCats) {
+		modalAddNewCats.addEventListener('show.bs.modal', event => {
+			var form = modalAddNewCats.querySelector('form');
+			var input_name = form.querySelector('input[name="name"]');
+			// var buttonToggle = event.relatedTarget
+
+			if (currentId) {
+				currentList.forEach((e, i) => {
+					if (e._id == currentId) {
+						input_name.value = e.name;
+						return
+					}
+				})
+			}
+
+			form.onsubmit = e => {
+				e.preventDefault()
+
+				if (input_name.value == "") {
+					alert('Vui long không bỏ trống thông tin!')
+					return
+				}
+
+				var cate = {
+					name: input_name.value
+				}
+
+				fetch(currentId ? 'cats/update/' + currentId : 'cats/create', {
+						method: currentId ? 'PUT' : 'POST',
+						headers: {
+							'Content-Type': 'application/json'
+						},
+						body: JSON.stringify(currentId ? {
+							...cate,
+							_id: currentId
+						} : cate)
+					})
+					.then(res => res.json())
+					.then(res => {
+						if (res.ok) {
+							window.location.reload();
+						} else {
+							alert("error:  " + res.msg)
+						}
+					})
+					.catch(err => alert("error: " + err))
+			}
+		})
+	}
+</script>

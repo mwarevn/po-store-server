@@ -1,0 +1,177 @@
+<hr>
+<div class="d-flex justify-content-between p-2 align-items-center mt-4">
+	<h4>Danh sách user </h4>
+	<button class="btn btn-primary btn-toggle-modal" data-bs-toggle="modal" data-bs-target="#modalAddNewUser">Tạo user mới +</button>
+</div>
+
+<!-- table display all user -->
+<table class="table">
+	<thead>
+		<tr>
+			<th scope="col">#</th>
+			<th scope="col">Full name</th>
+			<th scope="col">Email</th>
+			<th scope="col">Wallet</th>
+			<th scope="col">Action</th>
+		</tr>
+	</thead>
+	<tbody>
+	</tbody>
+</table>
+
+<!-- modal add new user -->
+<div class="modal fade" id="modalAddNewUser" tabindex="-1" aria-labelledby="modalAddNewUserLabel" aria-hidden="true">
+	<div class="modal-dialog">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h1 class="modal-title fs-5" id="modalAddNewUserLabel">User Editor</h1>
+				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+			</div>
+			<div class="modal-body">
+				<form>
+
+					<div class="mb-3">
+						<label for="user-input-name" class="form-label">Full name</label>
+						<input type="text" class="form-control" id="user-input-name" name="name" required>
+					</div>
+
+					<div class="mb-3">
+						<label for="user-input-email" class="form-label">Email</label>
+						<input type="email" class="form-control" id="user-input-email" name="email" required>
+					</div>
+
+					<div class="mb-3">
+						<label for="user-input-password" class="form-label">Password</label>
+						<input type="password" class="form-control" id="user-input-password" name="password" required>
+					</div>
+
+					<div class="mb-3">
+						<label for="user-input-wallet" class="form-label">Wallet</label>
+						<input type="number" class="form-control" id="user-input-wallet" name="wallet" required>
+					</div>
+
+					<button type="reset" class="btn-reset" hidden></button>
+					<button type="submit" class="btn btn-primary">Save</button>
+					<button type="button" class="btn btn-secondary btn-hide-modal" data-bs-dismiss="modal">Cancel</button>
+
+				</form>
+			</div>
+			<div class="modal-footer">
+			</div>
+		</div>
+	</div>
+</div>
+<script>
+	const modalAddNewUser = document.getElementById('modalAddNewUser')
+	const btnResetForm = modalAddNewUser.querySelector('.btn-reset')
+	const btnToggleModal = document.querySelector('.btn-toggle-modal')
+	const tbody = document.querySelector('tbody')
+	const form = modalAddNewUser.querySelector('form');
+	const inputFullName = document.getElementById('user-input-name'),
+		inputEmail = document.getElementById('user-input-email'),
+		inputPassword = document.getElementById('user-input-password'),
+		inputWallet = document.getElementById('user-input-wallet')
+	var currentId = null;
+
+	var listUser = [];
+
+	const setEditor = id => {
+		currentId = id
+
+		listUser.forEach((user) => {
+			if (user._id == currentId) {
+				inputFullName.value = user.fullName;
+				inputEmail.value = user.email;
+				inputPassword.value = user.password;
+				inputWallet.value = user.wallet || 0;
+				return;
+			}
+		})
+
+		btnToggleModal.click();
+	}
+
+	fetch('user')
+		.then(res => res.json())
+		.then(res => {
+			if (res.ok) {
+				listUser = res.users.map(user => {
+					if (!user.role || user.role != 'admin') {
+						return user
+					}
+				})
+			} else {
+				alert('error: ' + res.msg)
+			}
+		})
+		.then(() => {
+			tbody.innerHTML = listUser.map((user, index) => {
+				return `
+                <tr>
+                    <th scope="row">${index + 1}</th>
+                    <td>${user.fullName}</td>
+                    <td>${user.email}</td>
+                    <td>${user.wallet || '0'} VND</td>
+                    <td>
+                        <button class="btn btn-primary" onclick="setEditor('${user._id}')">Edit</button>
+                        <button class="btn btn-danger" onclick="confirmDelete('${user._id}')">Delete</button>
+                    </td>
+                </tr>
+                `
+			}).join('')
+		})
+
+
+	const confirmDelete = id => {
+		if (confirm('Are you sure for delete this user?')) {
+			fetch('user/delete/' + id, {
+					method: 'DELETE'
+				})
+				.then(res => res.json())
+				.then(res => {
+					if (res.ok) {
+						window.location.reload()
+						return
+					} else {
+						alert('Error: ' + res.msg)
+					}
+				})
+		}
+	}
+
+	modalAddNewUser.addEventListener('shown.bs.modal', () => {
+		form.onsubmit = e => {
+			e.preventDefault();
+			var user = {
+				_id: currentId,
+				fullName: inputFullName.value,
+				email: inputEmail.value,
+				password: inputPassword.value,
+				wallet: inputWallet.value
+			}
+
+			currentId || delete user._id
+
+			fetch(currentId ? 'user/update' : 'user/create', {
+					method: currentId ? 'PUT' : 'POST',
+					headers: {
+						'Content-Type': 'application/json'
+					},
+					body: JSON.stringify(user)
+				}).then(res => res.json())
+				.then(res => {
+					if (res.ok) {
+						window.location.reload();
+						return
+					}
+
+					alert('Error: ' + res.msg)
+				})
+		}
+	})
+
+	modalAddNewUser.addEventListener('hide.bs.modal', () => {
+		btnResetForm.click();
+		currentId = null
+	})
+</script>
